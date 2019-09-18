@@ -1,9 +1,9 @@
+master: [![Build Status](https://travis-ci.org/jenskeiner/muslrust.svg?branch=master)](https://travis-ci.org/jenskeiner/muslrust)
+develop: [![Build Status](https://travis-ci.org/jenskeiner/muslrust.svg?branch=develop)](https://travis-ci.org/jenskeiner/muslrust)
+
 # muslrust
-[![build status](https://secure.travis-ci.org/clux/muslrust.svg)](http://travis-ci.org/clux/muslrust)
-[![docker pulls](https://img.shields.io/docker/pulls/clux/muslrust.svg)](
-https://hub.docker.com/r/clux/muslrust/)
-[![docker image info](https://images.microbadger.com/badges/image/clux/muslrust.svg)](http://microbadger.com/images/clux/muslrust)
-[![docker tag](https://images.microbadger.com/badges/version/clux/muslrust.svg)](https://hub.docker.com/r/clux/muslrust/tags/)
+
+**This fork is work in progress. Don't use until this file has been updated accordingly.**
 
 A plain docker environment for building static binaries compiled with rust and linked against musl instead of glibc. Built nightly on travis.
 

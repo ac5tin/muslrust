@@ -1,35 +1,73 @@
-language: generic
+language: bash
+os: linux
+dist: bionic
+sudo: required
 services:
 - docker
-script:
-- export RUST_CHANNEL="nightly"
-- if [ "$TRAVIS_EVENT_TYPE" = "cron" ]; then
-    docker login -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD";
-  fi
-- docker build --build-arg CHANNEL=${RUST_CHANNEL} -t clux/muslrust .
-- export RUST_DATE=$(docker run -it clux/muslrust rustc --version | grep -oE "[[:digit:]]{4}-[[:digit:]]{2}-[[:digit:]]{2}")
-- export RUST_VER=$(docker run -it clux/muslrust rustc --version | grep -oE "[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]")
-- export TAG1="${RUST_VER}-${RUST_CHANNEL}"
-- export TAG2="${RUST_CHANNEL}-${RUST_DATE}"
-- export TAG3="${RUST_CHANNEL}"
-- make test
-after_success: |
-  if [ "$TRAVIS_EVENT_TYPE" = "cron" ]; then
-    docker push clux/muslrust
-    docker tag clux/muslrust clux/muslrust:$TAG1
-    docker push clux/muslrust:$TAG1
-    docker tag clux/muslrust clux/muslrust:$TAG2
-    docker push clux/muslrust:$TAG2
-    docker tag clux/muslrust clux/muslrust:$TAG3
-    docker push clux/muslrust:$TAG3
-  fi
-notifications:
-  email:
-    on_success: change
-    on_failure: always
+stages:
+  - zlib
+  - openssl-crypto
+  - openssl
+  - final
+  - muslrust
+before_install:
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+  - sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+  - sudo apt-get update
+  - sudo apt-get -y -o Dpkg::Options::="--force-confnew" install docker-ce
+  - echo '{"experimental":true}' | sudo tee /etc/docker/daemon.json # Enable experimental features in daemon.
+  - mkdir -p $HOME/.docker
+  - echo '{"experimental":"enabled"}' | tee $HOME/.docker/config.json # Enable experimental features in client.
+  - sudo service docker restart
+  - docker --version # Document Docker version used.
+  - docker run --rm --privileged docker/binfmt:66f9012c56a8316f9244ffd7622d7c21c1f6f28d
+  - docker login -u="${DOCKER_USERNAME}" -p="${DOCKER_PASSWORD}"
+  - docker buildx create --use --name multiarch --driver docker-container --platform linux/amd64,linux/arm,linux/arm64
+  - DOCKER_REPO=jenskeiner
+  - DOCKER_IMAGE_BUILDER=${DOCKER_REPO}/muslrust-builder
+  - DOCKER_IMAGE_CACHE=${DOCKER_REPO}/muslrust-builder
+  - if [[ "${TRAVIS_BRANCH}" == "master" ]]; then TAG="latest"; else TAG=${TRAVIS_BRANCH}; fi
+jobs:
+  include:
+    - stage: zlib
+      script: docker buildx build --progress plain --platform linux/amd64 --target zlib --tag ${DOCKER_IMAGE_BUILDER}:${TAG}-zlib-amd64 --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-amd64 --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-amd64,mode=max --push .
+    - stage: zlib
+      script: docker buildx build --progress plain --platform linux/arm --target zlib --tag ${DOCKER_IMAGE_BUILDER}:${TAG}-zlib-arm --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm,mode=max --push .
+    - stage: zlib
+      script: docker buildx build --progress plain --platform linux/arm64 --target zlib --tag ${DOCKER_IMAGE_BUILDER}:${TAG}-zlib-arm64 --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm64 --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm64,mode=max --push .
+    - stage: openssl-crypto
+      script: docker buildx build --progress plain --platform linux/amd64 --target openssl-crypto --tag ${DOCKER_IMAGE_BUILDER}:${TAG}-openssl-crypto-amd64 --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-amd64 --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-amd64,mode=max --push .
+    - stage: openssl-crypto
+      script: docker buildx build --progress plain --platform linux/arm --target openssl-crypto --tag ${DOCKER_IMAGE_BUILDER}:${TAG}-openssl-crypto-arm --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm,mode=max --push .
+    - stage: openssl-crypto
+      script: docker buildx build --progress plain --platform linux/arm64 --target openssl-crypto --tag ${DOCKER_IMAGE_BUILDER}:${TAG}-openssl-crypto-arm64 --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm64 --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm64,mode=max --push .
+    - stage: openssl
+      script: docker buildx build --progress plain --platform linux/amd64 --target openssl --tag ${DOCKER_IMAGE_BUILDER}:${TAG}-openssl-amd64 --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-amd64 --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-amd64,mode=max --push .
+    - stage: openssl
+      script: docker buildx build --progress plain --platform linux/arm --target openssl --tag ${DOCKER_IMAGE_BUILDER}:${TAG}-openssl-arm --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm,mode=max --push .
+    - stage: openssl
+      script: docker buildx build --progress plain --platform linux/arm64 --target openssl --tag ${DOCKER_IMAGE_BUILDER}:${TAG}-openssl-arm64 --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm64 --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm64,mode=max --push .
+    - stage: final
+      script: docker buildx build --progress plain --platform linux/amd64 --target final --tag ${TRAVIS_REPO_SLUG}:${TAG}-amd64 --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-amd64 --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-amd64,mode=max --push .
+    - stage: final
+      script: docker buildx build --progress plain --platform linux/arm --target final --tag ${TRAVIS_REPO_SLUG}:${TAG}-arm --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm,mode=max --push .
+    - stage: final
+      script: docker buildx build --progress plain --platform linux/arm64 --target final --tag ${TRAVIS_REPO_SLUG}:${TAG}-arm64 --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm64 --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm64,mode=max --push .
+    - stage: muslrust
+      script: |
+        docker manifest create ${TRAVIS_REPO_SLUG}:${TAG} ${TRAVIS_REPO_SLUG}:${TAG}-amd64 ${TRAVIS_REPO_SLUG}:${TAG}-arm ${TRAVIS_REPO_SLUG}:${TAG}-arm64
+        docker manifest annotate ${TRAVIS_REPO_SLUG}:${TAG} ${TRAVIS_REPO_SLUG}:${TAG}-amd64 --os linux --arch amd64
+        docker manifest annotate ${TRAVIS_REPO_SLUG}:${TAG} ${TRAVIS_REPO_SLUG}:${TAG}-arm --os linux --arch arm
+        docker manifest annotate ${TRAVIS_REPO_SLUG}:${TAG} ${TRAVIS_REPO_SLUG}:${TAG}-arm64 --os linux --arch arm64
+        docker manifest push ${TRAVIS_REPO_SLUG}:${TAG}
+
 env:
-  global:
-    secure: nXeXIF1Ys/rMMyjSlpUR4u5JLZRYBe3rG6ES7UeuQxEH92fZoNu2nK/NSbPF/5ggm8nsf5TSJequXQY8yCsr+ipsUtMkbbYkIMmMWphNVvA2b+HG0QQHkh3b8hwzFAI1q6/WRpP7X9+y0mCc8OpSMNLV5Wi80MzNyZLG3cOmHFzoCGrFprB2R0kTuzaWQuedkl7/O6xnZRIWuZ8PRgkmJENVL+vjx5TaQegs+jScVPE8uaubBZktWmNTHpCB31cVsi0psoZNsv7bmO3JQ76ozRP+OLGb+dbdu69UFKd97WDAr02U+aiCfJxNbeqOm1Vhz1GiByy7D+RKjQPgkbt0ipfPx/vN83bM8aoLzyrNd4Zt4BIsLfj7pdApjH2+nn24V4Lo6NrOFFpQxrmoycZPomfG7mMlqQVxqtPhEnZKHW53yuUG6BEhKy2y497ctEWIZkJdZISNdAewkuhBvsR4nALoTBNz13S0ALsLvD+HBLDqMwfy6VRxzDJB++TqAldbSpjJmKOHxjDDaNfldQeQFOibo2/CN18oFRtLXA2K0w//Hp974yVwMBnMqtzx2UiKsxmlDDq3fafQTZv0WARCZa91llUwC/C3KTyZiW5wP4Gvn1Ze2ktg47MWEhzBpSOd64YiT2f1XkYklffb9NSTsupdHvYOX4JT9tAePjMKIeI=
+ global:
+  - secure: "nbmMuSv+eVpp7e7IxwY+/oquparSQGYW9FuQbQ2ggw+ulcYidYq1saOGXOWUMo6iSEx3tmOY8GbTyxw9GN62IDb0rZAkSHdSdSFpTd8QI2k20MKdledPZk7oe5jTrBO047IdI0xMK/Bn2ZQ6HeJkV1IGQhIjYH4eci79KGRdqHEzkYdF0miJ/myUBaphmYW1lEy+zuUfms72N+KS0Hu521huO6sDQVLrlKFv/s5pZwFLzT/r6heYhwjpk3J0mQdSATttGjwAbK+Wa2KmqOsuEep/zaU53dnhN1L1RenBVY3394IA/WcpGxVHIZ5t/HlL1j2Pt0ijehSjBe/J331/3auXdKIP2mtsmWNgpcmYBcMwDaL2PNHyfLx2RI62tsxjvVxt13vuV8TRdJYEFsY8x2fF92g7YCZ7BBE+aH0BR5OikzNU6j+84C88dc9PdF0SD8Hff/S9YpmIp8jjp43CN5KncM9Du3lHBg5/PkWH5FbT1pCZq06/p6pmGTTiSukEPqNkQnMEfg52ln9TnexU20f7zUoMDy5uoO/HU+2NudSeUCoRf1iBZmDQeFQS1sq3x1yd0Bje2Xml17I7XFZwfdTLRctKSqtEeIIzzgLImwk+XA8RPh0FsPWT4DU6qk99jOgARabrELuOdxOSWudQxiXvIfEj75F3VQg4XzHt4ik="
+  - secure: "ZgUngI0nT+0hJfq6BfgA8kILH67s8bOAnXvEWBZgIEFpg7LdS2+fZEg8cQe/YdDECX4XrWDd+5z/nWPoGDJM2ju7i+bbz/sXsZK3jTHb6dUoBpFfupyOpeCCQwzRJCBIpr+LdC22cLdprxPrkEXJKIkQDZZtHx5pz2DQaEY4k1IvIlLtgQvMuwZZETS1yJ9R2qRyzrwqoBaqsZ1FMmZUK1hE/8zkV+MH6bmmSbbTXjIX0hGemOAkzwNLYcF2c/v4dvqBAaVF9jwkjBYSflKC3RnRQKgJw3qeF5R+SsAeaG/q/iwUHfVo8vALzmZGIzoBM4uPThkZQlJGMXN4SIgsnbtm+bVfTlXvOiT6ATctW37psgr1z4/rjV4vdARkPB9KWNA62Wifpn0D8s0LJjNhoSnf9ZqN8MTtmPlZ0k9MlRskqHHxt7yT3dm2dVLuDqHjFIWcZbDn0cULUnGr6DEDJ2uCfnWRuPlG+mQvED0LV+uM2wvU8TFb9hkkRh9vTbpvCleP4L7Tvg21tQI+YdvAM6dM5JMvnbw/fCQLLFDH0ysX4Tj+NReHGFRvDEtqz4qez0VIkMezWAXqpEDE5FeV8ZEFC1rZf4fp3s7VIXNnlTIuO7eC+/f+rT+D7Up5XIDnbgQV6dA/IXfjx4fEhGk1IXUud6GseyIBLlYUpzZ8T/s="
+
 branches:
   only:
+    - develop
     - master
+    - /^\d+\.\d+(\.\d+)?$/

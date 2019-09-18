@@ -1,0 +1,25 @@
+# IDE files
+.vscode
+.idea
+*.iml
+
+# Git files
+.git
+.gitignore
+
+# Documentation
+*.md
+LICENSE
+
+# Travis CI
+.travis.yml
+
+# DockerHub hooks
+hooks
+
+# Other
+Makefile
+update_libs.py
+test
+test.sh
+
