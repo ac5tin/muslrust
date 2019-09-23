@@ -37,23 +37,26 @@ before_install: |
   if [[ "${TRAVIS_BRANCH}" == "master" ]]; then TAG="latest"; else TAG=${TRAVIS_BRANCH}; fi
 jobs:
   include:
-    - stage: zlib
-      script: docker buildx build --progress plain --platform linux/arm --target zlib --tag ${DOCKER_IMAGE_BUILDER}:${TAG}-zlib-arm --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm,mode=max --push .
-    - stage: zlib
-      script: docker buildx build --progress plain --platform linux/arm64 --target zlib --tag ${DOCKER_IMAGE_BUILDER}:${TAG}-zlib-arm64 --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm64 --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm64,mode=max --push .
     - stage: openssl-crypto
+      name: Build openssl-crypto for linux/arm
       script: docker buildx build --progress plain --platform linux/arm --target openssl-crypto --tag ${DOCKER_IMAGE_BUILDER}:${TAG}-openssl-crypto-arm --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm,mode=max --push .
     - stage: openssl-crypto
+      name: Build openssl-crypto for linux/arm64
       script: docker buildx build --progress plain --platform linux/arm64 --target openssl-crypto --tag ${DOCKER_IMAGE_BUILDER}:${TAG}-openssl-crypto-arm64 --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm64 --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm64,mode=max --push .
     - stage: openssl
+      name: Build openssl for linux/arm
       script: docker buildx build --progress plain --platform linux/arm --target openssl --tag ${DOCKER_IMAGE_BUILDER}:${TAG}-openssl-arm --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm,mode=max --push .
     - stage: openssl
+      name: Build openssl for linux/arm64
       script: docker buildx build --progress plain --platform linux/arm64 --target openssl --tag ${DOCKER_IMAGE_BUILDER}:${TAG}-openssl-arm64 --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm64 --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm64,mode=max --push .
     - stage: final
+      name: Build final image for linux/amd64
       script: docker buildx build --progress plain --platform linux/amd64 --target final --tag ${TRAVIS_REPO_SLUG}:${TAG}-amd64 --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-amd64 --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-amd64,mode=max --push .
     - stage: final
+      name: Build final image for linux/arm
       script: docker buildx build --progress plain --platform linux/arm --target final --tag ${TRAVIS_REPO_SLUG}:${TAG}-arm --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm,mode=max --push .
     - stage: final
+      name: Build final image for linux/arm64
       script: docker buildx build --progress plain --platform linux/arm64 --target final --tag ${TRAVIS_REPO_SLUG}:${TAG}-arm64 --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm64 --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm64,mode=max --push .
     - stage: muslrust
       script: |
