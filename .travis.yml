@@ -10,39 +10,41 @@ stages:
   - openssl
   - final
   - muslrust
-before_install:
-  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-  - sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-  - sudo apt-get update
-  - sudo apt-get -y -o Dpkg::Options::="--force-confnew" install docker-ce
-  - echo '{"experimental":true}' | sudo tee /etc/docker/daemon.json # Enable experimental features in daemon.
-  - mkdir -p $HOME/.docker
-  - echo '{"experimental":"enabled"}' | tee $HOME/.docker/config.json # Enable experimental features in client.
-  - sudo service docker restart
-  - docker --version # Document Docker version used.
-  - docker run --rm --privileged docker/binfmt:66f9012c56a8316f9244ffd7622d7c21c1f6f28d
-  - docker login -u="${DOCKER_USERNAME}" -p="${DOCKER_PASSWORD}"
-  - docker buildx create --use --name multiarch --driver docker-container --platform linux/amd64,linux/arm,linux/arm64
-  - DOCKER_REPO=jenskeiner
-  - DOCKER_IMAGE_BUILDER=${DOCKER_REPO}/muslrust-builder
-  - DOCKER_IMAGE_CACHE=${DOCKER_REPO}/muslrust-builder
-  - if [[ "${TRAVIS_BRANCH}" == "master" ]]; then TAG="latest"; else TAG=${TRAVIS_BRANCH}; fi
+before_install: |
+  # Install an up-to-date version of docker.
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+  sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+  sudo apt-get update
+  sudo apt-get -y -o Dpkg::Options::="--force-confnew" install docker-ce
+  # Enable experimental features in daemon.
+  echo '{"experimental":true}' | sudo tee /etc/docker/daemon.json
+  # Enable experimental features in client.
+  mkdir -p $HOME/.docker
+  echo '{"experimental":"enabled"}' | tee $HOME/.docker/config.json
+  # Restart service to enable changed configuration.
+  sudo service docker restart
+  # Document Docker version used.
+  docker --version
+  # Add support for building multiple architectures via QEMU.
+  docker run --rm --privileged docker/binfmt:66f9012c56a8316f9244ffd7622d7c21c1f6f28d
+  # Login to Docker Hub
+  docker login -u="${DOCKER_USERNAME}" -p="${DOCKER_PASSWORD}"
+  # Create new builder instance that can build the desried architectures.
+  docker buildx create --use --name multiarch --driver docker-container --platform linux/amd64,linux/arm,linux/arm64
+  export DOCKER_REPO=jenskeiner
+  export DOCKER_IMAGE_BUILDER=${DOCKER_REPO}/muslrust-builder
+  export DOCKER_IMAGE_CACHE=${DOCKER_REPO}/muslrust-builder
+  if [[ "${TRAVIS_BRANCH}" == "master" ]]; then TAG="latest"; else TAG=${TRAVIS_BRANCH}; fi
 jobs:
   include:
-    - stage: zlib
-      script: docker buildx build --progress plain --platform linux/amd64 --target zlib --tag ${DOCKER_IMAGE_BUILDER}:${TAG}-zlib-amd64 --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-amd64 --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-amd64,mode=max --push .
     - stage: zlib
       script: docker buildx build --progress plain --platform linux/arm --target zlib --tag ${DOCKER_IMAGE_BUILDER}:${TAG}-zlib-arm --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm,mode=max --push .
     - stage: zlib
       script: docker buildx build --progress plain --platform linux/arm64 --target zlib --tag ${DOCKER_IMAGE_BUILDER}:${TAG}-zlib-arm64 --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm64 --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm64,mode=max --push .
     - stage: openssl-crypto
-      script: docker buildx build --progress plain --platform linux/amd64 --target openssl-crypto --tag ${DOCKER_IMAGE_BUILDER}:${TAG}-openssl-crypto-amd64 --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-amd64 --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-amd64,mode=max --push .
-    - stage: openssl-crypto
       script: docker buildx build --progress plain --platform linux/arm --target openssl-crypto --tag ${DOCKER_IMAGE_BUILDER}:${TAG}-openssl-crypto-arm --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm,mode=max --push .
     - stage: openssl-crypto
       script: docker buildx build --progress plain --platform linux/arm64 --target openssl-crypto --tag ${DOCKER_IMAGE_BUILDER}:${TAG}-openssl-crypto-arm64 --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm64 --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm64,mode=max --push .
-    - stage: openssl
-      script: docker buildx build --progress plain --platform linux/amd64 --target openssl --tag ${DOCKER_IMAGE_BUILDER}:${TAG}-openssl-amd64 --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-amd64 --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-amd64,mode=max --push .
     - stage: openssl
       script: docker buildx build --progress plain --platform linux/arm --target openssl --tag ${DOCKER_IMAGE_BUILDER}:${TAG}-openssl-arm --cache-from=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm --cache-to=type=registry,ref=${DOCKER_IMAGE_CACHE}:${TAG}-cache-arm,mode=max --push .
     - stage: openssl
